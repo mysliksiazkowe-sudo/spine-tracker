@@ -3,28 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spine Tracker BLE</title>
+    <title>Spine Tracker 3D - BLE</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #121212; color: white; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; }
-        button { padding: 12px 24px; font-size: 16px; background: #00e676; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
-        #status { margin-top: 10px; font-size: 14px; color: #aaa; }
+        body { margin: 0; overflow: hidden; background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
+        #controls { pointer-events: auto; background: rgba(0,0,0,0.5); display: inline-block; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        button { 
+            padding: 15px 30px; font-size: 18px; background: #00e676; color: black; 
+            border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3); transition: 0.3s;
+        }
+        button:hover { background: #00c853; transform: scale(1.05); }
+        #status { margin-top: 15px; font-size: 14px; color: #00e676; }
+        #data-debug { position: absolute; bottom: 20px; left: 20px; font-family: monospace; color: #666; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>Spine Tracker 3D</h1>
-        <button id="connectBtn">POŁĄCZ Z SENSORAMI</button>
-        <div id="status">Status: Rozłączony</div>
+        <div id="controls">
+            <h1>Spine Tracker 3D</h1>
+            <button id="connectBtn">POŁĄCZ Z SENSORAMI</button>
+            <div id="status">Status: Rozłączony (Czekam na akcję)</div>
+        </div>
     </div>
+    <div id="data-debug">Oczekiwanie na dane...</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
     <script>
         let scene, camera, renderer, segments = [];
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-        // 1. Inicjalizacja sceny 3D
+        // 1. Konfiguracja Sceny 3D
         function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -32,69 +43,102 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-            scene.add(light);
+            // Światło
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 10, 5);
+            scene.add(directionalLight);
 
-            // Tworzymy 3 segmenty kręgosłupa
+            // Tworzenie 3 segmentów kręgosłupa (Boxy)
+            const material = new THREE.MeshPhongMaterial({ color: 0x00aaff, shininess: 100 });
+            
             for (let i = 0; i < 3; i++) {
-                const geometry = new THREE.BoxGeometry(1, 2, 0.5);
-                const material = new THREE.MeshPhongMaterial({ color: 0x00aaff });
+                const geometry = new THREE.BoxGeometry(1.5, 2.5, 0.8);
                 const mesh = new THREE.Mesh(geometry, material);
                 
                 if (i > 0) {
-                    mesh.position.y = 2.1; // Ustaw segment nad poprzednim
-                    segments[i-1].add(mesh); // Hierarchia: segment wyższy jest dzieckiem niższego
+                    // Pozycjonujemy segment powyżej poprzedniego
+                    mesh.position.y = 2.8; 
+                    segments[i-1].add(mesh); // Hierarchia: wyższy segment jest "dzieckiem" niższego
                 } else {
-                    scene.add(mesh); // Pierwszy segment (lędźwiowy) w środku sceny
+                    scene.add(mesh); // Pierwszy segment (lędźwie) jest w centrum
                 }
                 segments.push(mesh);
             }
-            camera.position.z = 8;
-            camera.position.y = 2;
+
+            camera.position.z = 10;
+            camera.position.y = 3;
         }
 
-        // 2. Logika Bluetooth
+        // 2. Łączenie przez Web Bluetooth
         async function connectBLE() {
+            const statusEl = document.getElementById('status');
             try {
+                statusEl.innerText = "Szukam ESP32...";
                 const device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'ESP32_IMU_STATION' }],
                     optionalServices: [SERVICE_UUID]
                 });
+
+                statusEl.innerText = "Łączenie z usługą...";
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
-                const char = await service.getCharacteristic(CHAR_UUID);
+                const characteristic = await service.getCharacteristic(CHAR_UUID);
+
+                statusEl.innerText = "Odbieranie danych live!";
+                document.getElementById('connectBtn').style.display = 'none';
+
+                characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleData);
                 
-                document.getElementById('status').innerText = "Status: Połączono!";
-                
-                char.startNotifications();
-                char.addEventListener('characteristicvaluechanged', handleData);
-            } catch (err) {
-                console.error(err);
-                document.getElementById('status').innerText = "Błąd: " + err;
+            } catch (error) {
+                console.error(error);
+                statusEl.innerText = "Błąd: " + error.message;
+                statusEl.style.color = "#ff5252";
             }
         }
 
-        // 3. Obsługa danych (Parsowanie Stringa na rotację 3D)
+        // 3. Przetwarzanie danych z ESP32
         function handleData(event) {
-            const rawData = new TextDecoder().decode(event.target.value);
-            // Format: "0:W,X,Y,Z;1:W,X,Y,Z;2:W,X,Y,Z;"
-            const parts = rawData.split(';');
-            parts.forEach(part => {
-                if (part.includes(':')) {
-                    const [id, vals] = part.split(':');
-                    const [w, x, y, z] = vals.split(',').map(Number);
-                    if (segments[id]) {
-                        // Ustawiamy rotację za pomocą Quaternionów z BNO055
-                        segments[id].quaternion.set(x, z, -y, w); 
+            const decoder = new TextDecoder();
+            const rawData = decoder.decode(event.target.value);
+            document.getElementById('data-debug').innerText = "Raw: " + rawData;
+
+            // Oczekiwany format: "0:w,x,y,z;1:w,x,y,z;2:w,x,y,z;"
+            const packets = rawData.split(';');
+            packets.forEach(packet => {
+                if (packet.includes(':')) {
+                    const [idStr, valStr] = packet.split(':');
+                    const id = parseInt(idStr);
+                    const quatVals = valStr.split(',').map(Number);
+
+                    if (segments[id] && quatVals.length === 4) {
+                        const [w, x, y, z] = quatVals;
+                        // Mapowanie osi BNO055 na Three.js (może wymagać lekkiej korekty zależnie od montażu)
+                        // Standardowo: x, z, -y, w
+                        segments[id].quaternion.set(x, z, -y, w);
                     }
                 }
             });
         }
 
+        // 4. Pętla renderowania
         function animate() {
             requestAnimationFrame(animate);
+            if (segments[0]) {
+                // Opcjonalnie: wolny obrót całej sceny, żeby widzieć 3D
+                // scene.rotation.y += 0.005; 
+            }
             renderer.render(scene, camera);
         }
+
+        // Obsługa zmiany rozmiaru okna
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init3D();
         animate();
