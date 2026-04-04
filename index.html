@@ -77,9 +77,9 @@
             try {
                 statusEl.innerText = "Szukam ESP32...";
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'ESP32_IMU_STATION' }],
-                    optionalServices: [SERVICE_UUID]
-                });
+                acceptAllDevices: true, // Szukaj wszystkiego co ma Bluetooth
+                optionalServices: [SERVICE_UUID]
+            });
 
                 statusEl.innerText = "Łączenie z usługą...";
                 const server = await device.gatt.connect();
