@@ -1,28 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
-    <title>Spine Tracker 3D</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spine Tracker BLE</title>
     <style>
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
-        canvas { display: block; }
-        #controls { position: absolute; top: 20px; width: 100%; }
-        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        body { margin: 0; overflow: hidden; background: #121212; color: white; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; }
+        button { padding: 12px 24px; font-size: 16px; background: #00e676; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        #status { margin-top: 10px; font-size: 14px; color: #aaa; }
     </style>
 </head>
 <body>
-    <div id="controls">
-        <h1>Wizualizacja Kręgosłupa</h1>
-        <button id="connectBtn">POŁĄCZ Z ESP32</button>
+    <div id="ui">
+        <h1>Spine Tracker 3D</h1>
+        <button id="connectBtn">POŁĄCZ Z SENSORAMI</button>
         <div id="status">Status: Rozłączony</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
     <script>
-        // Tutaj w następnym kroku dodamy logikę Bluetooth i obracanie kręgów
-        document.getElementById('connectBtn').addEventListener('click', function() {
-            alert('Zaraz dodamy tu kod łączący z Twoim UUID!');
-        });
+        let scene, camera, renderer, segments = [];
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        // 1. Inicjalizacja sceny 3D
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+            scene.add(light);
+
+            // Tworzymy 3 segmenty kręgosłupa
+            for (let i = 0; i < 3; i++) {
+                const geometry = new THREE.BoxGeometry(1, 2, 0.5);
+                const material = new THREE.MeshPhongMaterial({ color: 0x00aaff });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                if (i > 0) {
+                    mesh.position.y = 2.1; // Ustaw segment nad poprzednim
+                    segments[i-1].add(mesh); // Hierarchia: segment wyższy jest dzieckiem niższego
+                } else {
+                    scene.add(mesh); // Pierwszy segment (lędźwiowy) w środku sceny
+                }
+                segments.push(mesh);
+            }
+            camera.position.z = 8;
+            camera.position.y = 2;
+        }
+
+        // 2. Logika Bluetooth
+        async function connectBLE() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'ESP32_IMU_STATION' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                const char = await service.getCharacteristic(CHAR_UUID);
+                
+                document.getElementById('status').innerText = "Status: Połączono!";
+                
+                char.startNotifications();
+                char.addEventListener('characteristicvaluechanged', handleData);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('status').innerText = "Błąd: " + err;
+            }
+        }
+
+        // 3. Obsługa danych (Parsowanie Stringa na rotację 3D)
+        function handleData(event) {
+            const rawData = new TextDecoder().decode(event.target.value);
+            // Format: "0:W,X,Y,Z;1:W,X,Y,Z;2:W,X,Y,Z;"
+            const parts = rawData.split(';');
+            parts.forEach(part => {
+                if (part.includes(':')) {
+                    const [id, vals] = part.split(':');
+                    const [w, x, y, z] = vals.split(',').map(Number);
+                    if (segments[id]) {
+                        // Ustawiamy rotację za pomocą Quaternionów z BNO055
+                        segments[id].quaternion.set(x, z, -y, w); 
+                    }
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        init3D();
+        animate();
+        document.getElementById('connectBtn').addEventListener('click', connectBLE);
     </script>
 </body>
 </html>
