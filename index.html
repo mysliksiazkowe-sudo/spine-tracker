@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spine Tracker 3D</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
+        canvas { display: block; }
+        #controls { position: absolute; top: 20px; width: 100%; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h1>Wizualizacja Kręgosłupa</h1>
+        <button id="connectBtn">POŁĄCZ Z ESP32</button>
+        <div id="status">Status: Rozłączony</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // Tutaj w następnym kroku dodamy logikę Bluetooth i obracanie kręgów
+        document.getElementById('connectBtn').addEventListener('click', function() {
+            alert('Zaraz dodamy tu kod łączący z Twoim UUID!');
+        });
+    </script>
+</body>
+</html>
