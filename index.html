@@ -94,9 +94,9 @@ function drawView(canvasId, type) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Punkt startowy (dół pleców)
+    // Punkt startowy (S5 / dół pleców)
     let x = canvas.width / 2;
-    let y = canvas.height * 0.85; 
+    let y = canvas.height * 0.85;
     const segLen = canvas.height * 0.25;
 
     ctx.beginPath(); 
@@ -108,21 +108,23 @@ function drawView(canvasId, type) {
         let rollRad = angles[i].r * Math.PI / 180;
 
         if (type === 'side') {
-            // ODWRÓCONY WIDOK BOCZNY (180 stopni względem poprzedniego "do góry nogami")
-            // Zmieniamy znaki, aby y zawsze uciekało do góry ekranu (odejmowanie)
-            // a x reagowało na pochylenie
-            x += Math.sin(pitchRad) * segLen; 
-            y -= Math.cos(pitchRad) * segLen; 
+            // WIDOK BOCZNY (Pionowy):
+            // Sinus odpowiada za wychylenie (przód/tył)
+            // Cosinus odpowiada za wysokość (góra)
+            x += Math.sin(pitchRad) * segLen;  
+            y -= Math.cos(pitchRad) * segLen;  
         } else {
-            // WIDOK TYLNY (Skolioza) - zostawiamy stabilny pion
-            x += Math.sin(rollRad) * segLen; 
+            // WIDOK TYLNY (Pionowy):
+            // Sinus odpowiada za wychylenie (lewo/prawo)
+            // Cosinus odpowiada za wysokość (góra)
+            x += Math.sin(rollRad) * segLen;  
             y -= Math.cos(rollRad) * segLen;
         }
         ctx.lineTo(x, y);
     }
     ctx.stroke();
 
-    // 2. RYSOWANIE KROPEK
+    // 2. RYSOWANIE KROPEK (resetujemy x i y do punktu startowego)
     x = canvas.width / 2;
     y = canvas.height * 0.85;
     for(let i = 0; i < 3; i++) {
