@@ -88,52 +88,63 @@ function drawView(canvasId, type) {
     canvas.height = canvas.offsetHeight;
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#3b82f6"; // Niebieska linia kręgosłupa
+    
+    // Ustawienia linii kręgosłupa
+    ctx.strokeStyle = "#3b82f6"; 
     ctx.lineWidth = 8; 
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-    // Startujemy od dołu ekranu (S5/Kość krzyżowa)
+    // Punkt startowy (dół pleców)
     let x = canvas.width / 2;
-    let y = canvas.height * 0.85; // 85% wysokości, żeby był zapas na dole
-    const segLen = canvas.height * 0.25; // Każdy segment ma 25% wysokości canvasu
+    let y = canvas.height * 0.85;
+    const segLen = canvas.height * 0.25;
 
     ctx.beginPath(); 
     ctx.moveTo(x, y);
 
     for(let i = 0; i < 3; i++) {
-        // Przeliczamy kąty z sensorów na radiany
         let pitchRad = angles[i].p * Math.PI / 180;
         let rollRad = angles[i].r * Math.PI / 180;
 
         if (type === 'side') {
-            // --- POPRAWKA DLA WIDOKU BOCZNEGO (Lordoza/Kifoza) ---
-            // Cel: Kręgosłup rośnie w górę (Y maleje), 
-            // a pochylenie (Pitch) odchyla punkt w lewo/prawo (X).
-            // Używamy sinusa dla X, bo dla Pitch=0 chcemy X=0.
-            // Używamy cosinusa dla Y, bo dla Pitch=0 chcemy pełny wzrost w górę.
-            
+            // WIDOK BOCZNY: Pitch steruje wychyleniem lewo/prawo (X)
+            // Sinus dla X, Cosinus dla Y sprawia, że bazowo rośnie w górę
             x += Math.sin(pitchRad) * segLen; 
             y -= Math.cos(pitchRad) * segLen; 
-            
         } else {
-            // --- POPRAWKA DLA WIDOKU TYLNEGO (Skolioza) ---
-            // Cel: Kręgosłup rośnie w górę (Y maleje), 
-            // a skrzywienie boczne (Roll) odchyla punkt w lewo/prawo (X).
-            // Tutaj logika jest identyczna, ale używamy kąta Roll.
-
+            // WIDOK TYLNY: Roll steruje wychyleniem lewo/prawo (X)
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
         }
 
+        // RYSOWANIE LINII do nowego punktu
         ctx.lineTo(x, y);
+    }
+    
+    // Wyświetlenie linii
+    ctx.stroke();
+
+    // RYSOWANIE KROPEK (osobna pętla, żeby były NA LINII)
+    x = canvas.width / 2;
+    y = canvas.height * 0.85;
+    for(let i = 0; i < 3; i++) {
+        let pitchRad = angles[i].p * Math.PI / 180;
+        let rollRad = angles[i].r * Math.PI / 180;
         
-        // Rysujemy biały punkt w miejscu sensora (krąg)
-        ctx.fillStyle = "#ffffff";
+        if (type === 'side') {
+            x += Math.sin(pitchRad) * segLen; 
+            y -= Math.cos(pitchRad) * segLen; 
+        } else {
+            x += Math.sin(rollRad) * segLen; 
+            y -= Math.cos(rollRad) * segLen;
+        }
+        
+        ctx.fillStyle = (i === 2) ? "#3b82f6" : "#ffffff"; // Górny punkt na niebiesko
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2); // Promień 6, pełne koło
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.fill();
     }
-    ctx.stroke();
 }
 function drawSpine() {
     drawView('sideView', 'side');
