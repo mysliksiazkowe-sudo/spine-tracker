@@ -3,146 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spine Tracker 3D - BLE</title>
+    <title>Medical Spine Analyzer</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
-        #controls { pointer-events: auto; background: rgba(0,0,0,0.5); display: inline-block; padding: 20px; border-radius: 15px; border: 1px solid #333; }
-        button { 
-            padding: 15px 30px; font-size: 18px; background: #00e676; color: black; 
-            border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3); transition: 0.3s;
-        }
-        button:hover { background: #00c853; transform: scale(1.05); }
-        #status { margin-top: 15px; font-size: 14px; color: #00e676; }
-        #data-debug { position: absolute; bottom: 20px; left: 20px; font-family: monospace; color: #666; font-size: 12px; pointer-events: none; }
+        body { margin: 0; background: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #header { padding: 20px; text-align: center; background: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        #container { display: flex; flex: 1; justify-content: space-around; align-items: center; padding: 20px; }
+        .view-box { background: #1e293b; border-radius: 12px; padding: 20px; width: 45%; height: 80%; position: relative; border: 1px solid #334155; }
+        canvas { width: 100%; height: 100%; border-bottom: 2px solid #475569; }
+        .label { position: absolute; top: 10px; left: 10px; font-weight: bold; color: #94a3b8; }
+        #stats { display: flex; justify-content: center; gap: 20px; padding: 20px; background: #1e293b; }
+        .stat-card { padding: 15px; border-radius: 8px; background: #0f172a; min-width: 150px; text-align: center; }
+        .value { font-size: 24px; font-weight: bold; display: block; margin-top: 5px; }
+        .safe { color: #22c55e; } .warning { color: #ef4444; }
+        button { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div id="controls">
-            <h1>Spine Tracker 3D</h1>
-            <button id="connectBtn">POŁĄCZ Z SENSORAMI</button>
-            <div id="status">Status: Rozłączony (Czekam na akcję)</div>
-        </div>
+
+<div id="header">
+    <h1>Spine Analyzer Pro</h1>
+    <button id="connectBtn">Uruchom Skanowanie</button>
+    <div id="status">Czekam na połączenie...</div>
+</div>
+
+<div id="container">
+    <div class="view-box">
+        <div class="label">WIDOK BOCZNY (Lordoza/Kifoza)</div>
+        <canvas id="sideView"></canvas>
     </div>
-    <div id="data-debug">Oczekiwanie na dane...</div>
+    <div class="view-box">
+        <div class="label">WIDOK TYLNY (Skolioza)</div>
+        <canvas id="rearView"></canvas>
+    </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <script>
-        let scene, camera, renderer, segments = [];
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+<div id="stats">
+    <div class="stat-card">Kifoza Piersiowa<span id="kifVal" class="value">0°</span></div>
+    <div class="stat-card">Lordoza Lędźwiowa<span id="lorVal" class="value">0°</span></div>
+    <div class="stat-card">Skolioza<span id="skoVal" class="value">0°</span></div>
+</div>
 
-        // 1. Konfiguracja Sceny 3D
-        function init3D() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+<script>
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-            // Światło
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(0, 10, 5);
-            scene.add(directionalLight);
+let angles = { 0: {p:0, r:0}, 1: {p:0, r:0}, 2: {p:0, r:0} };
 
-            // Tworzenie 3 segmentów kręgosłupa (Boxy)
-            const material = new THREE.MeshPhongMaterial({ color: 0x00aaff, shininess: 100 });
-            
-            for (let i = 0; i < 3; i++) {
-                const geometry = new THREE.BoxGeometry(1.5, 2.5, 0.8);
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                if (i > 0) {
-                    // Pozycjonujemy segment powyżej poprzedniego
-                    mesh.position.y = 2.8; 
-                    segments[i-1].add(mesh); // Hierarchia: wyższy segment jest "dzieckiem" niższego
-                } else {
-                    scene.add(mesh); // Pierwszy segment (lędźwie) jest w centrum
-                }
-                segments.push(mesh);
-            }
-
-            camera.position.z = 10;
-            camera.position.y = 3;
-        }
-
-        // 2. Łączenie przez Web Bluetooth
-        async function connectBLE() {
-            const statusEl = document.getElementById('status');
-            try {
-                statusEl.innerText = "Szukam ESP32...";
-                const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, // Szukaj wszystkiego co ma Bluetooth
-                optionalServices: [SERVICE_UUID]
-            });
-
-                statusEl.innerText = "Łączenie z usługą...";
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(CHAR_UUID);
-
-                statusEl.innerText = "Odbieranie danych live!";
-                document.getElementById('connectBtn').style.display = 'none';
-
-                characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
-                
-            } catch (error) {
-                console.error(error);
-                statusEl.innerText = "Błąd: " + error.message;
-                statusEl.style.color = "#ff5252";
-            }
-        }
-
-        // 3. Przetwarzanie danych z ESP32
-        function handleData(event) {
-            const decoder = new TextDecoder();
-            const rawData = decoder.decode(event.target.value);
-            document.getElementById('data-debug').innerText = "Raw: " + rawData;
-
-            // Oczekiwany format: "0:w,x,y,z;1:w,x,y,z;2:w,x,y,z;"
-            const packets = rawData.split(';');
-            packets.forEach(packet => {
-                if (packet.includes(':')) {
-                    const [idStr, valStr] = packet.split(':');
-                    const id = parseInt(idStr);
-                    const quatVals = valStr.split(',').map(Number);
-
-                    if (segments[id] && quatVals.length === 4) {
-                        const [w, x, y, z] = quatVals;
-                        // Mapowanie osi BNO055 na Three.js (może wymagać lekkiej korekty zależnie od montażu)
-                        // Standardowo: x, z, -y, w
-                        segments[id].quaternion.set(x, z, -y, w);
-                    }
-                }
-            });
-        }
-
-        // 4. Pętla renderowania
-        function animate() {
-            requestAnimationFrame(animate);
-            if (segments[0]) {
-                // Opcjonalnie: wolny obrót całej sceny, żeby widzieć 3D
-                // scene.rotation.y += 0.005; 
-            }
-            renderer.render(scene, camera);
-        }
-
-        // Obsługa zmiany rozmiaru okna
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+async function connectBLE() {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [SERVICE_UUID]
         });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const characteristic = await service.getCharacteristic(CHAR_UUID);
+        
+        document.getElementById('status').innerText = "Połączono!";
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', (e) => {
+            const raw = new TextDecoder().decode(e.target.value);
+            parseData(raw);
+            drawSpine();
+        });
+    } catch (err) { console.log(err); }
+}
 
-        init3D();
-        animate();
-        document.getElementById('connectBtn').addEventListener('click', connectBLE);
-    </script>
+function parseData(data) {
+    data.split(';').forEach(p => {
+        if(!p.includes(':')) return;
+        const [id, vals] = p.split(':');
+        const [w, x, y, z] = vals.split(',').map(Number);
+        
+        // Konwersja Quaternion -> Euler (uproszczona dla Pitch/Roll)
+        angles[id].p = Math.atan2(2.0 * (w*x + y*z), 1.0 - 2.0 * (x*x + y*y)) * 180 / Math.PI;
+        angles[id].r = Math.asin(2.0 * (w*y - z*x)) * 180 / Math.PI;
+    });
+}
+
+function drawView(canvasId, type) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 8; ctx.lineCap = "round";
+
+    let x = canvas.width / 2;
+    let y = canvas.height * 0.8;
+    const segLen = canvas.height * 0.25;
+
+    ctx.beginPath(); ctx.moveTo(x, y);
+
+    for(let i=0; i<3; i++) {
+        let angle = (type === 'side') ? angles[i].p : angles[i].r;
+        let rad = (angle - 90) * Math.PI / 180; // -90 bo Y celuje w dół
+        x += Math.cos(rad) * segLen;
+        y += Math.sin(rad) * segLen;
+        ctx.lineTo(x, y);
+        // Rysuj krąg (punkt sensora)
+        ctx.fillStyle = "#fff"; ctx.fillRect(x-4, y-4, 8, 8);
+    }
+    ctx.stroke();
+}
+
+function drawSpine() {
+    drawView('sideView', 'side');
+    drawView('rearView', 'rear');
+
+    // Obliczanie różnic (kątów relatywnych)
+    let kifoza = Math.abs(angles[2].p - angles[1].p).toFixed(1);
+    let lordoza = Math.abs(angles[1].p - angles[0].p).toFixed(1);
+    let skolioza = Math.max(Math.abs(angles[0].r - angles[1].r), Math.abs(angles[1].r - angles[2].r)).toFixed(1);
+
+    updateStat('kifVal', kifoza, 45);
+    updateStat('lorVal', lordoza, 50);
+    updateStat('skoVal', skolioza, 10);
+}
+
+function updateStat(id, val, limit) {
+    const el = document.getElementById(id);
+    el.innerText = val + "°";
+    el.className = "value " + (val > limit ? "warning" : "safe");
+}
+
+document.getElementById('connectBtn').addEventListener('click', connectBLE);
+</script>
 </body>
 </html>
