@@ -89,13 +89,12 @@ function drawView(canvasId, type) {
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Ustawienia linii kręgosłupa
     ctx.strokeStyle = "#3b82f6"; 
     ctx.lineWidth = 8; 
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Punkt startowy (dół pleców)
+    // Punkt startowy
     let x = canvas.width / 2;
     let y = canvas.height * 0.85;
     const segLen = canvas.height * 0.25;
@@ -103,29 +102,26 @@ function drawView(canvasId, type) {
     ctx.beginPath(); 
     ctx.moveTo(x, y);
 
+    // 1. RYSOWANIE LINII
     for(let i = 0; i < 3; i++) {
         let pitchRad = angles[i].p * Math.PI / 180;
         let rollRad = angles[i].r * Math.PI / 180;
 
         if (type === 'side') {
-            // WIDOK BOCZNY: Pitch steruje wychyleniem lewo/prawo (X)
-            // Sinus dla X, Cosinus dla Y sprawia, że bazowo rośnie w górę
-            x += Math.sin(pitchRad) * segLen; 
-            y -= Math.cos(pitchRad) * segLen; 
+            // OBRÓT O 90 STOPNI ZGODNIE Z RUCHEM WSKAZÓWEK:
+            // Zamieniamy: X bazuje na Cosinusie, Y bazuje na Sinusie
+            x += Math.cos(pitchRad) * segLen; 
+            y -= Math.sin(pitchRad) * segLen; 
         } else {
-            // WIDOK TYLNY: Roll steruje wychyleniem lewo/prawo (X)
+            // WIDOK TYLNY (zostaje pionowy, bo działał dobrze)
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
         }
-
-        // RYSOWANIE LINII do nowego punktu
         ctx.lineTo(x, y);
     }
-    
-    // Wyświetlenie linii
     ctx.stroke();
 
-    // RYSOWANIE KROPEK (osobna pętla, żeby były NA LINII)
+    // 2. RYSOWANIE KROPEK (resetujemy x i y do startu)
     x = canvas.width / 2;
     y = canvas.height * 0.85;
     for(let i = 0; i < 3; i++) {
@@ -133,14 +129,14 @@ function drawView(canvasId, type) {
         let rollRad = angles[i].r * Math.PI / 180;
         
         if (type === 'side') {
-            x += Math.sin(pitchRad) * segLen; 
-            y -= Math.cos(pitchRad) * segLen; 
+            x += Math.cos(pitchRad) * segLen; 
+            y -= Math.sin(pitchRad) * segLen; 
         } else {
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
         }
         
-        ctx.fillStyle = (i === 2) ? "#3b82f6" : "#ffffff"; // Górny punkt na niebiesko
+        ctx.fillStyle = (i === 2) ? "#3b82f6" : "#ffffff";
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.fill();
