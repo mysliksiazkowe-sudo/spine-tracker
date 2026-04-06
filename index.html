@@ -96,7 +96,7 @@ function drawView(canvasId, type) {
 
     // Punkt startowy (dół pleców)
     let x = canvas.width / 2;
-    let y = canvas.height * 0.85;
+    let y = canvas.height * 0.85; 
     const segLen = canvas.height * 0.25;
 
     ctx.beginPath(); 
@@ -108,17 +108,16 @@ function drawView(canvasId, type) {
         let rollRad = angles[i].r * Math.PI / 180;
 
         if (type === 'side') {
-            // WIDOK BOCZNY:
-            // x += Math.sin sprawia, że przy 0 stopniach nie ma wychylenia w bok
-            // y -= Math.cos sprawia, że przy 0 stopniach segment idzie prosto w górę
+            // ODWRÓCONY WIDOK BOCZNY (180 stopni względem poprzedniego "do góry nogami")
+            // Zmieniamy znaki, aby y zawsze uciekało do góry ekranu (odejmowanie)
+            // a x reagowało na pochylenie
             x += Math.sin(pitchRad) * segLen; 
             y -= Math.cos(pitchRad) * segLen; 
         } else {
-            // WIDOK TYLNY:
+            // WIDOK TYLNY (Skolioza) - zostawiamy stabilny pion
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
         }
-
         ctx.lineTo(x, y);
     }
     ctx.stroke();
