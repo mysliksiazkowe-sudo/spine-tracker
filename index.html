@@ -96,15 +96,22 @@ function drawView(canvasId, type) {
 
     ctx.beginPath(); ctx.moveTo(x, y);
 
-    for(let i=0; i<3; i++) {
-        let angle = (type === 'side') ? angles[i].p : angles[i].r;
-        let rad = (angle - 90) * Math.PI / 180; // -90 bo Y celuje w dół
+    // --- Sekcja pętli for wewnątrz funkcji drawView(...) ---
+for(let i=0; i<3; i++) {
+
+    let angle = (type === 'side') ? angles[i].p : angles[i].r;
+    let rad = angle * Math.PI / 180; 
+
+    if (type === 'side') {
+        x += Math.sin(rad) * segLen;
+        y += Math.cos(rad) * segLen;
+    } else {
         x += Math.cos(rad) * segLen;
         y += Math.sin(rad) * segLen;
-        ctx.lineTo(x, y);
-        // Rysuj krąg (punkt sensora)
-        ctx.fillStyle = "#fff"; ctx.fillRect(x-4, y-4, 8, 8);
     }
+    ctx.lineTo(x, y);
+    ctx.fillStyle = "#fff"; ctx.fillRect(x-4, y-4, 8, 8);
+}
     ctx.stroke();
 }
 
