@@ -111,7 +111,7 @@ function drawView(canvasId, type) {
             // OBRÓT O 90 STOPNI ZGODNIE Z RUCHEM WSKAZÓWEK:
             // Zamieniamy: X bazuje na Cosinusie, Y bazuje na Sinusie
             x -= Math.cos(pitchRad) * segLen; 
-            y -= Math.sin(pitchRad) * segLen; 
+            y += Math.sin(pitchRad) * segLen; 
         } else {
             // WIDOK TYLNY (zostaje pionowy, bo działał dobrze)
             x += Math.sin(rollRad) * segLen; 
@@ -130,7 +130,7 @@ function drawView(canvasId, type) {
         
         if (type === 'side') {
             x -= Math.cos(pitchRad) * segLen; 
-            y -= Math.sin(pitchRad) * segLen; 
+            y += Math.sin(pitchRad) * segLen; 
         } else {
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
