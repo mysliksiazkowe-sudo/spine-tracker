@@ -88,33 +88,53 @@ function drawView(canvasId, type) {
     canvas.height = canvas.offsetHeight;
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 8; ctx.lineCap = "round";
+    ctx.strokeStyle = "#3b82f6"; // Niebieska linia kręgosłupa
+    ctx.lineWidth = 8; 
+    ctx.lineCap = "round";
 
+    // Startujemy od dołu ekranu (S5/Kość krzyżowa)
     let x = canvas.width / 2;
-    let y = canvas.height * 0.8;
-    const segLen = canvas.height * 0.25;
+    let y = canvas.height * 0.85; // 85% wysokości, żeby był zapas na dole
+    const segLen = canvas.height * 0.25; // Każdy segment ma 25% wysokości canvasu
 
-    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.beginPath(); 
+    ctx.moveTo(x, y);
 
-    // --- Sekcja pętli for wewnątrz funkcji drawView(...) ---
-for(let i=0; i<3; i++) {
+    for(let i = 0; i < 3; i++) {
+        // Przeliczamy kąty z sensorów na radiany
+        let pitchRad = angles[i].p * Math.PI / 180;
+        let rollRad = angles[i].r * Math.PI / 180;
 
-    let angle = (type === 'side') ? angles[i].p : angles[i].r;
-    let rad = angle * Math.PI / 180; 
+        if (type === 'side') {
+            // --- POPRAWKA DLA WIDOKU BOCZNEGO (Lordoza/Kifoza) ---
+            // Cel: Kręgosłup rośnie w górę (Y maleje), 
+            // a pochylenie (Pitch) odchyla punkt w lewo/prawo (X).
+            // Używamy sinusa dla X, bo dla Pitch=0 chcemy X=0.
+            // Używamy cosinusa dla Y, bo dla Pitch=0 chcemy pełny wzrost w górę.
+            
+            x += Math.sin(pitchRad) * segLen; 
+            y -= Math.cos(pitchRad) * segLen; 
+            
+        } else {
+            // --- POPRAWKA DLA WIDOKU TYLNEGO (Skolioza) ---
+            // Cel: Kręgosłup rośnie w górę (Y maleje), 
+            // a skrzywienie boczne (Roll) odchyla punkt w lewo/prawo (X).
+            // Tutaj logika jest identyczna, ale używamy kąta Roll.
 
-    if (type === 'side') {
-        x += Math.sin(rad) * segLen;
-        y += Math.cos(rad) * segLen;
-    } else {
-        x += Math.cos(rad) * segLen;
-        y += Math.sin(rad) * segLen;
+            x += Math.sin(rollRad) * segLen; 
+            y -= Math.cos(rollRad) * segLen;
+        }
+
+        ctx.lineTo(x, y);
+        
+        // Rysujemy biały punkt w miejscu sensora (krąg)
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2); // Promień 6, pełne koło
+        ctx.fill();
     }
-    ctx.lineTo(x, y);
-    ctx.fillStyle = "#fff"; ctx.fillRect(x-4, y-4, 8, 8);
-}
     ctx.stroke();
 }
-
 function drawSpine() {
     drawView('sideView', 'side');
     drawView('rearView', 'rear');
