@@ -94,9 +94,9 @@ function drawView(canvasId, type) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Punkt startowy
+    // Punkt startowy - dół pleców
     let x = canvas.width / 2;
-    let y = canvas.height * 0.85;
+    let y = canvas.height * 0.85; 
     const segLen = canvas.height * 0.25;
 
     ctx.beginPath(); 
@@ -108,12 +108,14 @@ function drawView(canvasId, type) {
         let rollRad = angles[i].r * Math.PI / 180;
 
         if (type === 'side') {
-            // OBRÓT O 90 STOPNI ZGODNIE Z RUCHEM WSKAZÓWEK:
-            // Zamieniamy: X bazuje na Cosinusie, Y bazuje na Sinusie
-            x += Math.cos(pitchRad) * segLen; 
-            y -= Math.sin(pitchRad) * segLen; 
+            // ODWRÓCENIE: 
+            // x -= sprawia, że pochylenie w przód idzie w dobrą stronę
+            // y -= sprawia, że kręgosłup rośnie do góry ekranu
+            // Używamy sinusa dla X i cosinusa dla Y dla pełnego pionu
+            x -= Math.sin(pitchRad) * segLen; 
+            y -= Math.cos(pitchRad) * segLen; 
         } else {
-            // WIDOK TYLNY (zostaje pionowy, bo działał dobrze)
+            // WIDOK TYLNY (Skolioza - to już Ci działało)
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
         }
@@ -121,7 +123,7 @@ function drawView(canvasId, type) {
     }
     ctx.stroke();
 
-    // 2. RYSOWANIE KROPEK (resetujemy x i y do startu)
+    // 2. RYSOWANIE KROPEK (reset pozycji)
     x = canvas.width / 2;
     y = canvas.height * 0.85;
     for(let i = 0; i < 3; i++) {
@@ -129,8 +131,8 @@ function drawView(canvasId, type) {
         let rollRad = angles[i].r * Math.PI / 180;
         
         if (type === 'side') {
-            x += Math.cos(pitchRad) * segLen; 
-            y -= Math.sin(pitchRad) * segLen; 
+            x -= Math.sin(pitchRad) * segLen; 
+            y -= Math.cos(pitchRad) * segLen; 
         } else {
             x += Math.sin(rollRad) * segLen; 
             y -= Math.cos(rollRad) * segLen;
