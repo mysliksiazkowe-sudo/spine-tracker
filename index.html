@@ -23,6 +23,7 @@
 <div id="header">
     <h1>Spine Analyzer Pro</h1>
     <button id="connectBtn">Uruchom Skanowanie</button>
+    <button onclick="downloadCSV()" style="background:#22c55e">Pobierz Dane (.CSV)</button>
     <div id="status">Czekam na połączenie...</div>
 </div>
 
@@ -44,6 +45,7 @@
 </div>
 
 <script>
+let sessionData = []; // Tu będą trafiać pomiary
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
@@ -150,12 +152,34 @@ function drawSpine() {
     let kifoza = Math.abs(angles[2].p - angles[1].p).toFixed(1);
     let lordoza = Math.abs(angles[1].p - angles[0].p).toFixed(1);
     let skolioza = Math.max(Math.abs(angles[0].r - angles[1].r), Math.abs(angles[1].r - angles[2].r)).toFixed(1);
+    // Zapisuj dane co np. 1 sekundę (żeby nie zapchać pamięci)
+    if (Date.now() % 1000 < 100) { 
+        sessionData.push({
+            time: new Date().toLocaleTimeString(),
+            kifoza: kifoza,
+            lordoza: lordoza,
+            skolioza: skolioza
+        });
+    }
 
     updateStat('kifVal', kifoza, 45);
     updateStat('lorVal', lordoza, 50);
     updateStat('skoVal', skolioza, 10);
 }
+function downloadCSV() {
+    let csvContent = "data:text/csv;charset=utf-8,Czas,Kifoza,Lordoza,Skolioza\n";
+    
+    sessionData.forEach(row => {
+        csvContent += `${row.time},${row.kifoza},${row.lordoza},${row.skolioza}\n`;
+    });
 
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "sesja_kregoslup_" + Date.now() + ".csv");
+    document.body.appendChild(link);
+    link.click();
+}
 function updateStat(id, val, limit) {
     const el = document.getElementById(id);
     el.innerText = val + "°";
